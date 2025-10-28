@@ -147,7 +147,7 @@ export default function Home() {
           </div>
           <div className="flex-1 flex justify-center mt-8 md:mt-0">
             <Image
-              src="/about-me.jpg"
+              src="/about-me.png"
               alt="About Zahra"
               width={400}
               height={300}
