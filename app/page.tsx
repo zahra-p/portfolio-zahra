@@ -86,7 +86,7 @@ export default function Home() {
           >
             <div className="relative w-56 h-56 md:w-64 md:h-64 rounded-full overflow-hidden shadow-lg ring-4 ring-purple-300 dark:ring-purple-700">
               <Image
-                src="/profile.jpg" //(ابعاد پیشنهادی: 800×600)
+                src="/profile.png" //(ابعاد پیشنهادی: 800×600)
                 alt="Zahra Adelinia"
                 fill
                 className="object-cover"
