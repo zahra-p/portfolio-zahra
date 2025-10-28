@@ -1,0 +1,23 @@
+[
+  {
+    "id": "saaS-dashboard",
+    "title": "SaaS Dashboard Platform",
+    "description": "Admin dashboard for tracking users and sales analytics (Next.js, TypeScript, Prisma). Improved data load speed by 45%.",
+    "demo": "https://demo1.vercel.app",
+    "github": "https://github.com/zahra-adelinia/demo1"
+  },
+  {
+    "id": "ecommerce-landing",
+    "title": "E-commerce Landing Page",
+    "description": "Conversion-focused landing page with Stripe integration (Next.js, React). Page load under 2s.",
+    "demo": "https://demo2.vercel.app",
+    "github": "https://github.com/zahra-adelinia/demo2"
+  },
+  {
+    "id": "figma-to-react",
+    "title": "Figma-to-React Converter",
+    "description": "Tool to convert Figma UI into responsive React components (React, Tailwind). Delivered components within 48 hours.",
+    "demo": "https://demo3.vercel.app",
+    "github": "https://github.com/zahra-adelinia/demo3"
+  }
+]
