@@ -5,9 +5,9 @@ import ProductCard from "../../components/ProductCard";
 export default function PracticesPage() {
   const [counter, setCounter] = useState(0);
   const products = [
-    { id: 1, name: "sports shoes", price: 850000, available: true },
-    { id: 2, name: "slippers", price: 20000, available: false },
-    { id: 3, name: "Office shoes", price: 50000, available: false },
+    { id: "1", name: "sports shoes", price: 850000, available: true },
+    { id: "2", name: "slippers", price: 20000, available: false },
+    { id: "3", name: "Office shoes", price: 50000, available: false },
   ];
 
   // تعیین رنگ متن بر اساس مقدار counter
