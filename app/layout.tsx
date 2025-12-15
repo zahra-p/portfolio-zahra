@@ -5,6 +5,7 @@ import { ReactNode, useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Script from "next/script";
+import Providers from "./providers";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -40,11 +41,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
       <body className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
         <div className="min-h-screen flex flex-col">
-          <Navbar />
-          <main className="flex-1 max-w-4xl mx-auto p-6">
-            {mounted && children}
-          </main>
-          <Footer />
+          <Providers>
+            <Navbar />
+            {/* <main className="flex-1 max-w-4xl mx-auto p-6"> */}
+            <main className="flex-1 max-w-4xl mx-auto p-6">
+              {mounted && children}
+            </main>
+            <Footer />
+          </Providers>
         </div>
       </body>
     </html>

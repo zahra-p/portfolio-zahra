@@ -1,0 +1,6 @@
+[
+  { "id": 1, "name": "کفش اسپرت", "price": 850000, "available": true,  "image": "/shop/shoes.jpg" },
+  { "id": 2, "name": "دمپایی",     "price": 20000,  "available": false, "image": "/shop/slippers.jpg" },
+  { "id": 3, "name": "کفش رسمی",   "price": 50000,  "available": false, "image": "/shop/office.jpg" },
+  { "id": 4, "name": "کفش پیاده‌روی","price": 720000, "available": true, "image": "/shop/walking.jpg" }
+]

@@ -48,7 +48,8 @@ export default function ContactPage() {
   };
 
   return (
-    <main className="max-w-2xl mx-auto px-6 py-20">
+    // <main className="max-w-2xl mx-auto px-6 py-20">
+    <main className=" mx-auto px-6 py-20">
       <Reveal>
         <motion.h1
           initial={{ opacity: 0, y: 10 }}

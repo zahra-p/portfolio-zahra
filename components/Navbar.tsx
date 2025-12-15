@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
 import { motion } from "framer-motion";
+// TODO: Improve this navbar later 1404/09/02
 
 /**
  * Navbar component
@@ -18,6 +19,9 @@ export default function Navbar() {
     { href: "/projects", label: "Projects" },
     { href: "/contact", label: "Contact" },
     { href: "/about", label: "About" },
+    { href: "/practices", label: "Practices" },
+    { href: "/product-cart", label: "product-cart" },
+    { href: "/orders", label: "orders" },
   ];
 
   return (

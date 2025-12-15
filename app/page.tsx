@@ -28,7 +28,8 @@ import Reveal from "../components/Reveal";
 
 export default function Home() {
   return (
-    <main className="max-w-6xl mx-auto px-6 py-20 space-y-32">
+    // <main className="max-w-6xl mx-auto px-6 py-20 space-y-32">
+    <main className=" mx-auto px-6 py-20 space-y-32">
       {/* 🌟 Hero Section */}
       <section className="flex flex-col-reverse md:flex-row items-center justify-between gap-10">
         <Reveal>
