@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction, createSelector } from "@reduxjs/toolkit";
 
 export interface CartItem {
   id: string; // آیدی نهایی در استور: همیشه رشته
@@ -63,8 +63,22 @@ export const { hydrate, addItem, removeOne, removeItem, clearCart } =
 export default cartSlice.reducer;
 
 // Selectorها
-export const selectItems = (s: { cart: CartState }) => s.cart.items;
-export const selectTotalQuantity = (s: { cart: CartState }) =>
-  s.cart.items.reduce((sum, i) => sum + i.quantity, 0);
-export const selectTotalPrice = (s: { cart: CartState }) =>
-  s.cart.items.reduce((sum, i) => sum + i.quantity * i.price, 0);
+
+export const selectCartState = (s: { cart: CartState }) => s.cart;
+export const selectItems = createSelector(
+  [selectCartState],
+  (cart) => cart.items
+);
+
+export const selectTotalQuantity = createSelector([selectItems], (items) =>
+  items.reduce((sum, i) => sum + i.quantity, 0)
+);
+
+export const selectTotalPrice = createSelector([selectItems], (items) =>
+  items.reduce((sum, i) => sum + i.quantity * i.price, 0)
+);
+export const makeSelectQtyById = () =>
+  createSelector(
+    [selectItems, (_: any, id: string) => id],
+    (items, id) => items.find((x) => x.id === id)?.quantity ?? 0
+  );

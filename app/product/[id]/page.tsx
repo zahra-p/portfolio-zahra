@@ -6,13 +6,14 @@ import { useParams } from "next/navigation";
 import Image from "next/image";
 import { useDispatch } from "react-redux";
 import { addItem } from "../../../lib/features/cartSlice";
+import { qk } from "../../../lib/queryKeys";
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const dispatch = useDispatch();
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["product", id],
+    queryKey: qk.product(id),
     queryFn: () => fetchProduct(id),
     enabled: !!id,
     staleTime: 60_000,

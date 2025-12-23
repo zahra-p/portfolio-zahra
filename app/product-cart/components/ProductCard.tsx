@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { fetchProduct } from "../../../lib/api/products";
+import { qk } from "../../../lib/queryKeys";
 
 // Prefetch روی hover/فوکس (اختیاری: اگر از لیست می‌آیی)
 // می‌تونی در لیست محصولات از qc.prefetchQuery(...) استفاده کنی.
@@ -30,7 +31,7 @@ export default function ProductCard({
 
   const prefetch = () =>
     qc.prefetchQuery({
-      queryKey: ["product", id],
+      queryKey: qk.product(id),
       queryFn: () => fetchProduct(id),
       staleTime: 60_000,
     });

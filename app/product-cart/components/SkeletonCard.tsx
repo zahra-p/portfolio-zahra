@@ -2,7 +2,7 @@ type SkeletonCardProps = {
   count?: number; // چند تا کارت اسکلت؟ پیش‌فرض 8
 };
 
-export function SkeletonCard({ count = 8 }: SkeletonCardProps) {
+export default function SkeletonCard({ count = 8 }: SkeletonCardProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 px-6 max-w-6xl mx-auto pb-12">
       {Array.from({ length: count }).map((_, i) => (

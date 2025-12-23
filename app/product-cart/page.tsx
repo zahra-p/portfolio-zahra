@@ -1,16 +1,29 @@
 "use client";
 
-import Link from "next/link";
+//import Link from "next/link";
+import type { QueryKey } from "@tanstack/react-query";
+import { qk, type ProductSort } from "../../lib/queryKeys";
+
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useMemo, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useDispatch, useSelector } from "react-redux";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
+
 import { toast } from "sonner";
 
 import ProductCard from "./components/ProductCard";
-import { fetchProducts } from "../../lib/api/products";
-import { createOrder as createOrderApi } from "../../lib/api/orders";
+import SkeletonCard from "./components/SkeletonCard";
+import ErrorState from "./components/ErrorState";
+import EmptyState from "./components/EmptyState";
+
+import { useDebouncedValue } from "../../lib/hooks/useDebouncedValue";
+import { fetchProducts, type Product } from "../../lib/fetch-products";
+import {
+  createOrder as createOrderApi,
+  type Order,
+} from "../../lib/api/orders";
 
 import {
   addItem,
@@ -21,10 +34,7 @@ import {
   selectTotalPrice,
   selectTotalQuantity,
 } from "../../lib/features/cartSlice";
-
-import { SkeletonCard } from "./components/SkeletonCard";
-//import { EmptyState } from "./components/EmptyState";
-//import { ErrorState } from "./components/ErrorState";
+import SearchBox from "./components/SearchBox";
 
 export default function ProductCartPage() {
   const router = useRouter();
@@ -32,95 +42,250 @@ export default function ProductCartPage() {
   const qc = useQueryClient();
   const dispatch = useDispatch();
 
-  // ---------- URL ↔ UI: initialize from query string ----------
+  type Sort = "newest" | "price-asc" | "price-desc";
+
+  const initialSort = (searchParams.get("sort") as ProductSort) ?? "newest";
+  const [sort, setSort] = useState<ProductSort>(initialSort);
+
+  // URL → UI
   const initialQuery = searchParams.get("q") ?? "";
   const initialFilter: "all" | "available" =
     searchParams.get("available") === "true" ? "available" : "all";
 
+  // Search (debounced)
   const [query, setQuery] = useState(initialQuery);
+  const debouncedQuery = useDebouncedValue(query, 300);
+
+  // Filter
   const [filter, setFilter] = useState<"all" | "available">(initialFilter);
 
-  // ---------- Redux selectors ----------
+  // Redux
   const items = useSelector(selectItems);
   const totalPrice = useSelector(selectTotalPrice);
   const totalQuantity = useSelector(selectTotalQuantity);
 
-  // ---------- React Query: products ----------
+  // Products (server-side filter + debounce)
   const {
-    data: products,
+    data,
     isLoading,
     isError: isProductsError,
     error: productsError,
-    isFetching, // هنگام refetch
+    isFetching,
   } = useQuery({
-    queryKey: ["products"], // (فعلاً API بدون فیلتر؛ فیلتر سمت کلاینت انجام می‌شود)
-    queryFn: fetchProducts,
+    queryKey: qk.products(debouncedQuery, filter, sort),
+    queryFn: ({ signal }) =>
+      fetchProducts({
+        q: debouncedQuery || undefined,
+        available: filter === "available" ? true : undefined,
+        sort,
+        signal,
+      }),
+
+    // v5 جایگزین keepPreviousData:
+    // placeholderData: (prev) => prev,
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
 
-  // ---------- Client-side filter (name + availability) ----------
-  const filtered = useMemo(() => {
-    const list = products ?? [];
-    const byAvail =
-      filter === "available" ? list.filter((p) => p.available) : list;
+  // آرایهٔ امن برای TS
+  const products = (data ?? []) as Product[];
 
-    if (!query.trim()) return byAvail;
-
-    const q = query.trim().toLowerCase();
-    // برای فارسی هم همین متد کار می‌کند
-    return byAvail.filter((p) => p.name.toLowerCase().includes(q));
-  }, [products, filter, query]);
-
-  // ---------- Sync UI to URL (debounced-ish) ----------
+  // UI → URL (فقط با مقدار debounce شده)
   useEffect(() => {
-    // سینک به /product-cart?q=&available=true
-    const params = new URLSearchParams();
-    if (query.trim()) params.set("q", query.trim());
-    if (filter === "available") params.set("available", "true");
-    const qs = params.toString();
-    router.push(qs ? `/product-cart?${qs}` : `/product-cart`, {
-      scroll: false,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, filter]); // فقط وقتی Query/Filter عوض شد
+    const p = new URLSearchParams();
 
-  // ---------- Create order (mutation) ----------
-  const { mutate: submitOrder, isPending } = useMutation({
+    const q = debouncedQuery.trim();
+    if (q) p.set("q", q);
+
+    if (filter === "available") p.set("available", "true");
+
+    // sort را هم در URL نگه می‌داریم
+    // پیشنهاد: اگر sort پیش‌فرض "newest" است، می‌تونی نذاری توی URL تا تمیزتر بماند
+    p.set("sort", sort);
+
+    const qs = p.toString();
+    const nextUrl = qs ? `/product-cart?${qs}` : "/product-cart";
+
+    // جلوگیری از replace بی‌دلیل (لوپ)
+    const currentQs = searchParams.toString();
+    if (qs === currentQs) return;
+
+    router.replace(nextUrl, { scroll: false });
+  }, [debouncedQuery, filter, sort, router, searchParams]);
+
+  // Create Order (with precise cache updates)
+
+  // const { mutate: submitOrder, isPending } = useMutation({
+  //   mutationFn: createOrderApi,
+
+  //   onSuccess: (data: Order) => {
+  //     // 1) UI فوری
+  //     dispatch(clearCart());
+
+  //     // 2) Cache دقیق
+  //     qc.setQueryData<Order>(["order", data.id], data);
+  //     qc.invalidateQueries({ queryKey: ["orders"] });
+  //     qc.invalidateQueries({ queryKey: ["products"] }); // چون ممکنه موجودی/available تغییر کند
+
+  //     // 3) پیام کوتاه (اختیاری)
+  //     toast.success(`Order registered (#${data.id}) 🎉`);
+
+  //     // 4) ناوبری به صفحهٔ تأیید/جزئیات سفارش
+  //     router.push(`/orders/${data.id}`);
+  //   },
+
+  //   onError: (err) => {
+  //     const msg = err instanceof Error ? err.message : "Order failed";
+  //     toast.error(msg);
+  //   },
+  // });
+
+  type SubmitOrderPayload = {
+    items: Array<{ id: string; quantity: number; price: number }>;
+    total: number;
+  };
+
+  type MutCtx = {
+    // محصولات
+    prevProductsQueries: Array<[QueryKey, Product[] | undefined]>;
+    prevProductDetails: Array<[QueryKey, Product | undefined]>;
+    orderedIds: string[];
+
+    // سفارش‌ها
+    prevOrders?: Order[];
+    tempOrderId: string;
+  };
+
+  const { mutate: submitOrder, isPending } = useMutation<
+    Order,
+    Error,
+    SubmitOrderPayload,
+    MutCtx
+  >({
     mutationFn: createOrderApi,
-    onSuccess: (data) => {
-      dispatch(clearCart());
-      qc.invalidateQueries({ queryKey: ["orders"] });
 
-      toast.success(
-        <div className="text-center" dir="ltr">
-          <p>Your order was registered with number {data.id}. 🎉</p>
-          <div className="mt-2 flex items-center justify-center gap-4">
-            <button
-              onClick={() => router.push(`/orders/${data.id}`)}
-              className="underline"
-            >
-              View order {data.id}
-            </button>
-            <Link href="/product-cart" className="underline">
-              Continue shopping
-            </Link>
-          </div>
-        </div>
+    // ✅ Optimistic update (الف): کالاهای داخل سفارش را موقتاً ناموجود کن
+    onMutate: async (payload) => {
+      // --- جلوگیری از overwrite شدن optimistic
+      await qc.cancelQueries({ queryKey: ["products"] });
+      await qc.cancelQueries({ queryKey: ["orders"] });
+
+      // --- snapshot محصولات (همه حالت‌های ["products", q, filter])
+      const prevProductsQueries = qc.getQueriesData<Product[]>({
+        queryKey: ["products"],
+      });
+
+      const orderedIds = payload.items.map((i) => String(i.id));
+      const prevProductDetails: Array<[QueryKey, Product | undefined]> =
+        orderedIds.map((id) => {
+          const key: QueryKey = qk.product(id);
+          return [key, qc.getQueryData<Product>(key)];
+        });
+
+      // --- Optimistic محصولات: ناموجود کن
+      const idSet = new Set(orderedIds);
+
+      qc.setQueriesData<Product[]>({ queryKey: ["products"] }, (old) => {
+        if (!old) return old;
+        return old.map((p) =>
+          idSet.has(String(p.id)) ? { ...p, available: false } : p
+        );
+      });
+
+      orderedIds.forEach((id) => {
+        qc.setQueryData<Product>(qk.product(id), (old) =>
+          old ? { ...old, available: false } : old
+        );
+      });
+
+      // --- snapshot سفارش‌ها
+      const prevOrders = qc.getQueryData<Order[]>(["orders"]);
+
+      // --- Optimistic سفارش‌ها: یک سفارش موقت بساز و به انتهای لیست اضافه کن
+      const tempOrderId = `temp-${Date.now()}`;
+      const tempOrder: Order = {
+        id: tempOrderId,
+        items: payload.items,
+        total: payload.total,
+        createdAt: Date.now(),
+      };
+
+      qc.setQueryData<Order[]>(["orders"], (old) =>
+        old ? [...old, tempOrder] : [tempOrder]
       );
+
+      return {
+        prevProductsQueries,
+        prevProductDetails,
+        orderedIds,
+        prevOrders,
+        tempOrderId,
+      };
     },
-    onError: (err) => {
-      const msg = err instanceof Error ? err.message : "Order failed";
-      toast.error(msg);
+
+    onError: (_err, _payload, ctx) => {
+      if (!ctx) return;
+
+      // rollback محصولات
+      ctx.prevProductsQueries.forEach(([key, data]) => {
+        qc.setQueryData(key, data);
+      });
+      ctx.prevProductDetails.forEach(([key, data]) => {
+        qc.setQueryData(key, data);
+      });
+
+      // rollback سفارش‌ها
+      if (typeof ctx.prevOrders === "undefined") {
+        qc.removeQueries({ queryKey: ["orders"], exact: true });
+      } else {
+        qc.setQueryData(["orders"], ctx.prevOrders);
+      }
+
+      toast.error("Order failed — rolled back.");
+    },
+
+    onSuccess: (data, _vars, ctx) => {
+      // جایگزینی سفارش موقت با سفارش واقعی
+      if (ctx?.tempOrderId) {
+        qc.setQueryData<Order[]>(["orders"], (old) => {
+          if (!old) return old;
+          return old.map((o) => (o.id === ctx.tempOrderId ? data : o));
+        });
+      }
+
+      // کش جزئیات سفارش
+      // qc.setQueryData(["order", data.id], data);
+      qc.setQueryData(qk.order(data.id), data);
+
+      // UI
+      dispatch(clearCart());
+
+      // sync با سرور (source of truth)
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+
+      qc.invalidateQueries({ queryKey: qk.productsRoot() });
+      qc.invalidateQueries({ queryKey: qk.ordersRoot() });
+
+      toast.success(`Order registered (#${data.id}) 🎉`);
+      router.push(`/orders/${data.id}`);
+    },
+
+    onSettled: (_data, _err, _payload, ctx) => {
+      // جزئیات محصولات سفارش‌شده هم sync شود
+      ctx?.orderedIds.forEach((id) => {
+        qc.invalidateQueries({ queryKey: qk.product(id) });
+      });
     },
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen">
       {/* Navbar */}
       <nav className="w-full bg-white dark:bg-gray-800 shadow-md py-4 px-6 flex justify-between items-center sticky top-0 z-50">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-          🛍️ Demo Storefront
+          🛍️ فروشگاه من
         </h1>
         <motion.div
           key={totalQuantity}
@@ -133,19 +298,20 @@ export default function ProductCartPage() {
         </motion.div>
       </nav>
 
-      {/* نوار باریک هنگام refetch محصولات
+      {/* نوار باریک هنگام refetch */}
       {isFetching && !isLoading && (
-        <div className="h-1 w-full bg-gradient-to-r from-transparent via-purple-400 to-transparent animate-pulse mb-2 rounded" />
-      )} */}
+        <div className="sticky top-[64px] z-40 h-1 w-full bg-gradient-to-r from-transparent via-purple-400 to-transparent animate-pulse" />
+      )}
 
-      {/* کنترل‌ها: سرچ + فیلتر */}
+      {/* Controls: Search + Filter */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 my-8 px-6">
-        <input
+        {/* <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="جست‌وجو در محصولات…"
           className="w-full sm:w-96 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 outline-none focus:ring-2 focus:ring-purple-400"
-        />
+        /> */}
+        <SearchBox value={query} onChange={setQuery} />
 
         <div className="inline-flex border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden shadow-sm">
           {(["all", "available"] as const).map((opt) => (
@@ -162,75 +328,65 @@ export default function ProductCartPage() {
             </button>
           ))}
         </div>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as ProductSort)}
+          className="w-full sm:w-auto rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2"
+        >
+          <option value="newest">جدیدترین</option>
+          <option value="price-asc">ارزان‌تر</option>
+          <option value="price-desc">گران‌تر</option>
+        </select>
       </div>
 
-      {/* وضعیت خطا */}
-      {isProductsError && (
-        <div className="text-center text-red-600">
-          خطا در بارگذاری:{" "}
-          {productsError instanceof Error
-            ? productsError.message
-            : "خطای ناشناخته"}
-        </div>
-      )}
-
-      {/* محصولات: لودینگ → Skeleton | غیر از آن → Grid */}
-      {isLoading ? (
-        <SkeletonCard count={8} />
-      ) : !isProductsError ? (
-        <div
-          className={`px-6 max-w-6xl mx-auto pb-12 ${
-            isFetching && !isLoading ? "animate-pulse" : ""
-          }`}
-        >
-          {/* نوار باریک refetch بالای باکس محصولات */}
-
-          <div
-            className={`w-full mb-3 rounded transition-all ${
-              isFetching && !isLoading
-                ? "h-1 bg-gradient-to-r from-transparent via-purple-400 to-transparent animate-pulse"
-                : "h-0"
-            }`}
-          />
-
-          {/* باکس محصولات */}
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow p-4">
-            {filtered.length === 0 ? (
-              <p className="text-center text-gray-500">
-                نتیجه‌ای با این فیلتر/جست‌وجو پیدا نشد.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {filtered.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    id={product.id}
-                    name={product.name}
-                    price={product.price}
-                    available={product.available}
-                    image={product.image}
-                    onAddToCart={
-                      product.available
-                        ? () =>
-                            dispatch(
-                              addItem({
-                                id: product.id,
-                                name: product.name,
-                                price: product.price,
-                                image: product.image,
-                              })
-                            )
-                        : undefined
-                    }
-                  />
-                ))}
-              </div>
-            )}
+      {/* Body */}
+      <div className="px-6 max-w-6xl mx-auto pb-12">
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
           </div>
-        </div>
-      ) : null}
+        ) : isProductsError ? (
+          <ErrorState
+            message={
+              productsError instanceof Error
+                ? productsError.message
+                : "خطا در بارگذاری"
+            }
+          />
+        ) : products.length === 0 ? (
+          <EmptyState text="نتیجه‌ای با این فیلتر/جست‌وجو پیدا نشد." />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {products.map((p) => (
+              <ProductCard
+                key={p.id}
+                id={p.id}
+                name={p.name}
+                price={p.price}
+                available={p.available}
+                image={p.image}
+                onAddToCart={
+                  p.available
+                    ? () =>
+                        dispatch(
+                          addItem({
+                            id: p.id,
+                            name: p.name,
+                            price: p.price,
+                            image: p.image,
+                          })
+                        )
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* سبد خرید پایین صفحه */}
+      {/* Cart */}
       <div className="max-w-6xl mx-auto bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-8 px-6 rounded-t-2xl shadow-inner">
         <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100">
           🧾 سبد خرید

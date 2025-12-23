@@ -3,13 +3,14 @@
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { fetchOrder, Order } from "../../../lib/api/orders";
+import { qk } from "../../../lib/queryKeys";
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["order", id],
+    queryKey: qk.order(id),
     queryFn: () => fetchOrder(id), // ← پاس دادن string
     enabled: !!id, // ← فقط بررسی تهی نبودن
     staleTime: 60_000,

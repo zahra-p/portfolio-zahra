@@ -1,4 +1,5 @@
-// fetcher محصولات
+export type Sort = "newest" | "price-asc" | "price-desc";
+
 export type Product = {
   id: string;
   name: string;
@@ -9,19 +10,38 @@ export type Product = {
 
 const BASE = process.env.NEXT_PUBLIC_API ?? "http://localhost:4000";
 
-// فقط fetcher (یک تابع async ساده) است.
-// React Query از همین تابع به‌عنوان queryFn استفاده می‌کند.
-export async function fetchProducts(): Promise<Product[]> {
-  // از public سرو می‌شود، پس مستقیم قابل fetch است:
-  // const res = await fetch("/shop/products.json", { cache: "no-store" });
-  const res = await fetch(`${BASE}/products`, { cache: "no-store" });
-  //{ cache: "no-store" }
-  // به
-  // fetch
-  //  می‌گوید از کش مرورگر استفاده نکند؛ کش اصلی را
-  // React Query
-  // مدیریت می‌کند
-  // (با queryKey، staleTime، …).
+type Params = {
+  q?: string;
+  available?: boolean;
+  signal?: AbortSignal;
+};
+
+export async function fetchProducts(opts: {
+  q?: string;
+  available?: boolean;
+  sort?: Sort;
+  signal?: AbortSignal;
+}): Promise<Product[]> {
+  const params = new URLSearchParams();
+
+  if (opts.q) params.set("name_like", opts.q);
+  if (typeof opts.available === "boolean")
+    params.set("available", String(opts.available));
+
+  // ✅ Server-side sort
+  const sort = opts.sort ?? "newest";
+  if (sort === "newest") {
+    params.set("_sort", "createdAt");
+    params.set("_order", "desc");
+  } else {
+    params.set("_sort", "price");
+    params.set("_order", sort === "price-asc" ? "asc" : "desc");
+  }
+
+  const res = await fetch(`${BASE}/products?${params.toString()}`, {
+    signal: opts.signal,
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error("failed to load products");
   return res.json();
 }

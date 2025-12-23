@@ -42,7 +42,8 @@ npm i @reduxjs/toolkit react-redux
 npm i @tanstack/react-query
 npm i @tanstack/react-query-devtools
 
-npm i -D json-server
+npm i -D json-server@0.17.4
+
 راه‌اندازی JSON Server (API لوکال)
 
 چرا این ترکیب؟
