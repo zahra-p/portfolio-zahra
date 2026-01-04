@@ -63,13 +63,15 @@ export const { hydrate, addItem, removeOne, removeItem, clearCart } =
 export default cartSlice.reducer;
 
 // Selectorها
-
+//دقیقاً اینجا memoization اتفاق می‌افته
+//این باعث می‌شه items به شکل پایدار برگرده (تا وقتی cart عوض نشده).
 export const selectCartState = (s: { cart: CartState }) => s.cart;
 export const selectItems = createSelector(
   [selectCartState],
   (cart) => cart.items
 );
 
+//یعنی reduce فقط وقتی اجرا می‌شه که items تغییر کنه.
 export const selectTotalQuantity = createSelector([selectItems], (items) =>
   items.reduce((sum, i) => sum + i.quantity, 0)
 );
@@ -77,6 +79,19 @@ export const selectTotalQuantity = createSelector([selectItems], (items) =>
 export const selectTotalPrice = createSelector([selectItems], (items) =>
   items.reduce((sum, i) => sum + i.quantity * i.price, 0)
 );
+
+//برای هر ProductCard یک selector جدا بسازی
+//هر کارت فقط وقتی rerender بشه که quantity خودش عوض شده
+//این selector جدید وقتی صدا زده شود، این کار را می‌کند:
+
+//makeSelectQtyById() یک selector جدید می‌سازد (یک تابع)
+//این selector جدید وقتی صدا زده شود، این کار را می‌کند:
+//items را از Redux می‌گیرد
+//id را هم می‌گیرد
+//quantity همان آیتم را پیدا می‌کند و برمی‌گرداند
+//پس خروجی makeSelectQtyById() اینه:
+//✅ یک تابع selector مثل این:
+//(state, id) => quantity
 export const makeSelectQtyById = () =>
   createSelector(
     [selectItems, (_: any, id: string) => id],

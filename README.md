@@ -1,5 +1,7 @@
 # Zahra Adelinia — Portfolio (Next.js + Tailwind)
 
+Production-ready demo storefront built with Next.js (App Router) and TypeScript. It features server-driven search/filter/sort via a JSON API, smooth UX with skeleton loading and background refetch indicators, product detail prefetching, and a real cart powered by Redux Toolkit. Orders are created with TanStack Query mutations, with cache updates and invalidation to keep the UI consistent across the Products and Orders pages.
+
 **What you got**
 
 - Next.js (App Router) portfolio template
@@ -46,7 +48,7 @@ npm i -D json-server@0.17.4
 
 راه‌اندازی JSON Server (API لوکال)
 
-چرا این ترکیب؟
+npm run api
 
 React Query: کش، لودینگ/خطا، ریفچ، staleTime، retry—all-in-one برای داده‌های قابل دریافت از سرور.
 
@@ -54,6 +56,6 @@ Redux Toolkit: مدیریت cart، شمارنده، جمع قیمت، و تعا�
 
 نتیجه: کد تمیزتر، تست‌پذیرتر، و آمادهٔ مقیاس.
 
-الگوی صنعتی: React Query برای سرور استِیت، Redux برای اپ استِیت—ترکیب ایده‌آل برای مصاحبه‌ها و پروژه‌های واقعی.
-
-npm run api
+Featured: Storefront/Cart
+https://portfolio-zahra-adelinia.vercel.app/product-cart?sort=newest
+https://github.com/zahra-p/portfolio-zahra/tree/main/app/product-cart

@@ -116,31 +116,6 @@ export default function ProductCartPage() {
 
   // Create Order (with precise cache updates)
 
-  // const { mutate: submitOrder, isPending } = useMutation({
-  //   mutationFn: createOrderApi,
-
-  //   onSuccess: (data: Order) => {
-  //     // 1) UI فوری
-  //     dispatch(clearCart());
-
-  //     // 2) Cache دقیق
-  //     qc.setQueryData<Order>(["order", data.id], data);
-  //     qc.invalidateQueries({ queryKey: ["orders"] });
-  //     qc.invalidateQueries({ queryKey: ["products"] }); // چون ممکنه موجودی/available تغییر کند
-
-  //     // 3) پیام کوتاه (اختیاری)
-  //     toast.success(`Order registered (#${data.id}) 🎉`);
-
-  //     // 4) ناوبری به صفحهٔ تأیید/جزئیات سفارش
-  //     router.push(`/orders/${data.id}`);
-  //   },
-
-  //   onError: (err) => {
-  //     const msg = err instanceof Error ? err.message : "Order failed";
-  //     toast.error(msg);
-  //   },
-  // });
-
   type SubmitOrderPayload = {
     items: Array<{ id: string; quantity: number; price: number }>;
     total: number;
@@ -172,6 +147,7 @@ export default function ProductCartPage() {
       await qc.cancelQueries({ queryKey: ["orders"] });
 
       // --- snapshot محصولات (همه حالت‌های ["products", q, filter])
+      //از وضعیت فعلی snapshot می‌گیری (برای rollback)
       const prevProductsQueries = qc.getQueriesData<Product[]>({
         queryKey: ["products"],
       });
@@ -180,10 +156,11 @@ export default function ProductCartPage() {
       const prevProductDetails: Array<[QueryKey, Product | undefined]> =
         orderedIds.map((id) => {
           const key: QueryKey = qk.product(id);
-          return [key, qc.getQueryData<Product>(key)];
+          return [key, qc.getQueryData<Product>(key)]; //برای جزئیات محصول‌ها
         });
 
       // --- Optimistic محصولات: ناموجود کن
+      //محصولات سفارش‌داده‌شده رو موقتاً available:false می‌کنی
       const idSet = new Set(orderedIds);
 
       qc.setQueriesData<Product[]>({ queryKey: ["products"] }, (old) => {
@@ -211,10 +188,13 @@ export default function ProductCartPage() {
         createdAt: Date.now(),
       };
 
+      //ک سفارش موقت می‌سازی و توی ["orders"] می‌گذاری
       qc.setQueryData<Order[]>(["orders"], (old) =>
-        old ? [...old, tempOrder] : [tempOrder]
+        //  old ? [...old, tempOrder] : [tempOrder]
+        old ? [tempOrder, ...old] : [tempOrder]
       );
 
+      //و در آخر ctx برمی‌گردونی (چیزی که برای rollback لازم داری)
       return {
         prevProductsQueries,
         prevProductDetails,
@@ -226,11 +206,15 @@ export default function ProductCartPage() {
 
     onError: (_err, _payload, ctx) => {
       if (!ctx) return;
+      //اگر سرور خطا بده، تو دقیقاً “عکس‌برداری‌ها” رو برمی‌گردونی
 
       // rollback محصولات
-      ctx.prevProductsQueries.forEach(([key, data]) => {
-        qc.setQueryData(key, data);
-      });
+      ctx.prevProductsQueries.forEach(
+        ([key, data]) => {
+          qc.setQueryData(key, data);
+        }
+        //پس UI دقیقاً می‌ره به حالت قبل
+      );
       ctx.prevProductDetails.forEach(([key, data]) => {
         qc.setQueryData(key, data);
       });
@@ -245,6 +229,7 @@ export default function ProductCartPage() {
       toast.error("Order failed — rolled back.");
     },
 
+    //(تثبیت optimistic)
     onSuccess: (data, _vars, ctx) => {
       // جایگزینی سفارش موقت با سفارش واقعی
       if (ctx?.tempOrderId) {
@@ -262,9 +247,7 @@ export default function ProductCartPage() {
       dispatch(clearCart());
 
       // sync با سرور (source of truth)
-      qc.invalidateQueries({ queryKey: ["orders"] });
-      qc.invalidateQueries({ queryKey: ["products"] });
-
+      //sync با سرور
       qc.invalidateQueries({ queryKey: qk.productsRoot() });
       qc.invalidateQueries({ queryKey: qk.ordersRoot() });
 
@@ -367,19 +350,19 @@ export default function ProductCartPage() {
                 price={p.price}
                 available={p.available}
                 image={p.image}
-                onAddToCart={
-                  p.available
-                    ? () =>
-                        dispatch(
-                          addItem({
-                            id: p.id,
-                            name: p.name,
-                            price: p.price,
-                            image: p.image,
-                          })
-                        )
-                    : undefined
-                }
+                // onAddToCart={
+                //   p.available
+                //     ? () =>
+                //         dispatch(
+                //           addItem({
+                //             id: p.id,
+                //             name: p.name,
+                //             price: p.price,
+                //             image: p.image,
+                //           })
+                //         )
+                //     : undefined
+                // }
               />
             ))}
           </div>

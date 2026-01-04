@@ -1,4 +1,7 @@
 "use client";
+import { memo } from "react";
+import { useDispatch } from "react-redux";
+import { addItem } from "../../../lib/features/cartSlice";
 
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -6,6 +9,11 @@ import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { fetchProduct } from "../../../lib/api/products";
 import { qk } from "../../../lib/queryKeys";
+
+//هر کارت، quantity خودش را از Redux بگیرد (بدون اینکه همه کارت‌ها بی‌خودی rerender شوند).
+import { useMemo } from "react";
+import { useSelector } from "react-redux";
+import { makeSelectQtyById } from "../../../lib/features/cartSlice";
 
 // Prefetch روی hover/فوکس (اختیاری: اگر از لیست می‌آیی)
 // می‌تونی در لیست محصولات از qc.prefetchQuery(...) استفاده کنی.
@@ -16,18 +24,53 @@ interface ProductCardProps {
   price: number;
   available: boolean;
   image: string;
-  onAddToCart?: () => void;
+  //onAddToCart?: () => void;
 }
 
-export default function ProductCard({
+function ProductCard({
   id,
   name,
   price,
   available,
   image,
-  onAddToCart,
-}: ProductCardProps) {
+}: //  onAddToCart,
+ProductCardProps) {
+  const dispatch = useDispatch();
+
+  const handleAdd = () => {
+    dispatch(addItem({ id, name, price, image }));
+  };
+
+  console.count(`🧩 ProductCard render id=${id}`);
+
   const qc = useQueryClient();
+
+  //چرا با useMemo آن را “یکبار” می‌سازیم؟
+  //اگر این کار را نکنی و هر رندر بنویسی:
+  //const selectQty = makeSelectQtyById();
+  //یعنی هر بار رندر، یک selector جدید می‌سازی
+  //و چون createSelector داخل خودش cache دارد (نتیجه‌ی قبلی را نگه می‌دارد)، با ساختن selector جدید:
+  //cache قبلی از بین می‌رود
+  //دوباره محاسبه انجام می‌شود
+  //در لیست کارت‌های زیاد، این یعنی فشار اضافی و رندرهای بیشتر
+
+  //این selector را فقط یک‌بار برای این کارت بساز و نگه دار
+
+  //makeSelectQtyById() یک “selector اختصاصی” می‌سازد که خودش داخلش حافظه دارد (memoization).
+  //اگر هر بار render، دوباره makeSelectQtyById() را صدا بزنی،
+  //  هر بار یک selector جدید می‌سازی و memoizationش عملاً از بین می‌رود.
+  //useMemo(..., []) باعث می‌شود فقط یک بار این selector ساخته شود و تا وقتی کارت روی صفحه هست همان یکی باقی بماند.
+  //نتیجه: selector می‌تواند خروجی آخر را یادش بماند و فقط وقتی لازم است دوباره حساب کند.
+  const selectQty = useMemo(makeSelectQtyById, []);
+
+  //از Redux مقدار qty این کارت را بگیر؛ فقط اگر تغییر کرد rerender کن
+
+  //useSelector کامپوننت را به Redux وصل می‌کند.
+  //اینجا ما می‌گوییم: «از کل store فقط qty مربوط به همین id را بده»
+  //Redux هر بار که store تغییر کند، این selector را دوباره اجرا می‌کند؛
+  //  اگر خروجی qty تغییر کرده باشد، این کارت re-render می‌شود.
+
+  const qty = useSelector((s: any) => selectQty(s, String(id)));
 
   const prefetch = () =>
     qc.prefetchQuery({
@@ -90,7 +133,13 @@ export default function ProductCard({
           {price.toLocaleString("fa-IR")} تومان
         </p>
 
-        {available && onAddToCart && (
+        {qty > 0 && (
+          <p className="text-xs mb-2 text-purple-700 dark:text-purple-300">
+            In cart: <b>{qty}</b>
+          </p>
+        )}
+
+        {/* {available && onAddToCart && (
           <motion.button
             whileTap={{ scale: 0.9 }}
             whileHover={{
@@ -101,10 +150,26 @@ export default function ProductCard({
             onClick={onAddToCart}
             className="px-4 py-2 text-sm font-semibold border border-green-500 text-green-600 rounded-lg transition-colors duration-300"
           >
-            افزودن به سبد خرید 🛒
+            Add to cart 🛒
+          </motion.button>
+        )} */}
+
+        {available && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            whileHover={{
+              scale: 1.05,
+              backgroundColor: "#22c55e",
+              color: "#fff",
+            }}
+            onClick={handleAdd}
+            className="px-4 py-2 text-sm font-semibold border border-green-500 text-green-600 rounded-lg transition-colors duration-300"
+          >
+            Add to cart 🛒
           </motion.button>
         )}
       </div>
     </motion.div>
   );
 }
+export default memo(ProductCard);

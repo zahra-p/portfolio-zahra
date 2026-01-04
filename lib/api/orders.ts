@@ -1,3 +1,5 @@
+//Search روی Orders (فقط با Order ID) + سینک با URL + سرور ساید
+
 import { NextResponse } from "next/server";
 
 const BASE = process.env.NEXT_PUBLIC_API ?? "http://localhost:4000";
@@ -31,10 +33,29 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   });
 }
 
-export async function fetchOrders(): Promise<Order[]> {
-  const res = await fetch(`${BASE}/orders`, { cache: "no-store" });
-  if (!res.ok) throw new Error("failed to load orders");
-  return res.json();
+export async function fetchOrders(params: {
+  page: number;
+  limit: number;
+  sort: "newest" | "oldest";
+  q?: string;
+  signal?: AbortSignal;
+}): Promise<{ items: Order[]; totalCount: number }> {
+  const { page, limit, sort, q, signal } = params;
+
+  const sp = new URLSearchParams();
+  sp.set("_page", String(page));
+  sp.set("_limit", String(limit));
+  sp.set("_sort", "createdAt");
+  sp.set("_order", sort === "newest" ? "desc" : "asc");
+
+  if (q?.trim()) sp.set("id_like", q.trim()); // سرچ فقط روی Order ID
+
+  const res = await fetch(`${BASE}/orders?${sp.toString()}`, { signal });
+  if (!res.ok) throw new Error("Failed to load orders");
+
+  const totalCount = Number(res.headers.get("x-total-count") ?? "0");
+  const items = (await res.json()) as Order[];
+  return { items, totalCount };
 }
 
 export async function fetchOrder(id: string): Promise<Order> {
